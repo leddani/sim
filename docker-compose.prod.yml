@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   simstudio:
     image: ghcr.io/simstudioai/simstudio:latest
@@ -82,10 +84,14 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      # ✅ përdor user/db realë dhe hostin lokal
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-simstudio}']
       interval: 5s
       timeout: 5s
       retries: 5
 
 volumes:
+  # ✅ përdor volumin ekzistues në Coolify si external për të shmangur konfliktin
   postgres_data:
+    name: cmf35135z006smzavwb0c84qhpostgres_data
+    external: true
