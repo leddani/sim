@@ -60,15 +60,38 @@ services:
       retries: 3
       start_period: 10s
 
-  migrations:
-    image: ghcr.io/simstudioai/migrations:latest
-    environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-simstudio}
+  # ⬇️ SHTO KETE SHERBIM: krijon extension-in 'vector' para migrimeve
+  dbinit:
+    image: pgvector/pgvector:pg17
     depends_on:
       db:
         condition: service_healthy
-    command: ['bun', 'run', 'db:migrate']
-    restart: 'no'
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-simstudio}
+    entrypoint:
+      - sh
+      - -lc
+      - >
+        psql "postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-simstudio}"
+        -v ON_ERROR_STOP=1
+        -c "CREATE EXTENSION IF NOT EXISTS vector;"
+    restart: "no"
+
+  migrations:
+    image: ghcr.io/simstudioai/migrations:latest
+    depends_on:
+      db:
+        condition: service_healthy
+      dbinit:
+        condition: service_completed_successfully
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-simstudio}
+      - PRISMA_LOG_LEVEL=debug
+    # ekzekuto migrimet; nëse script-i 'db:migrate' dështon, provo direkt 'prisma migrate deploy'
+    entrypoint: [ "sh", "-lc", "bun run db:migrate || bunx prisma migrate deploy" ]
+    restart: "no"
 
   db:
     image: pgvector/pgvector:pg17
@@ -82,12 +105,11 @@ services:
     volumes:
       - sim_pgdata_v2:/var/lib/postgresql/data
     healthcheck:
-      # ✅ më robust: host lokal + DB e saktë
+      # më robust: host lokal + DB e saktë
       test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-simstudio}']
       interval: 5s
       timeout: 5s
       retries: 5
 
 volumes:
-  # ✅ Volum i RI (i pastër) për të shmangur konfliktet me volumet e vjetra
   sim_pgdata_v2:
