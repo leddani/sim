@@ -62,7 +62,7 @@ services:
       retries: 3
       start_period: 10s
 
-  # Krijon pgvector me super stabilitet + logje të qarta
+  # ---- Krijon/validon pgvector me logje të qarta ----
   dbinit:
     image: pgvector/pgvector:pg17
     depends_on:
@@ -77,15 +77,16 @@ services:
       - -lc
       - >
         set -eux;
-        # Prit derisa DB të jetë gati në nivel TCP/protokoll
-        until pg_isready -h db -p 5432 -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-simstudio}"; do
+        # prit DB vetëm për "accepting connections" (pa auth)
+        until pg_isready -h db -p 5432 >/dev/null 2>&1; do
           echo "DB not ready yet..."; sleep 1;
         done;
         export PGPASSWORD="${POSTGRES_PASSWORD:-postgres}";
-        # Krijo extension-in 'vector' nëse mungon
-        psql "host=db port=5432 user=${POSTGRES_USER:-postgres} dbname=${POSTGRES_DB:-simstudio}" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS vector;";
-        # Verifiko që u krijua
-        psql "host=db port=5432 user=${POSTGRES_USER:-postgres} dbname=${POSTGRES_DB:-simstudio}" -v ON_ERROR_STOP=1 -c "SELECT extname, extversion FROM pg_extension WHERE extname='vector';"
+        # krijo/validon extension-in 'vector' (me sslmode=disable për siguri)
+        psql "postgresql://${POSTGRES_USER:-postgres}@db:5432/${POSTGRES_DB:-simstudio}?sslmode=disable"
+          -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS vector;";
+        psql "postgresql://${POSTGRES_USER:-postgres}@db:5432/${POSTGRES_DB:-simstudio}?sslmode=disable"
+          -v ON_ERROR_STOP=1 -c "SELECT extname, extversion FROM pg_extension WHERE extname='vector';"
     restart: "no"
 
   migrations:
@@ -96,7 +97,7 @@ services:
       dbinit:
         condition: service_completed_successfully
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-simstudio}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-simstudio}?sslmode=disable
       - PRISMA_LOG_LEVEL=debug
       - DEBUG=*
     entrypoint:
@@ -128,8 +129,7 @@ services:
       retries: 5
 
 volumes:
-  # Volumi ekzistues në Coolify po të jep WARN për project-id tjetër.
-  # Për ta qetësuar WARN-in, deklaroje si external me emrin ekzakt nga logu:
+  # Shmang WARN-in e project-id: deklaroje si external me emrin ekzakt (nga logu yt)
   sim_pgdata_v2:
     name: cmf36di7q0076mzavpfhcd5ywsim_pgdata_v2
     external: true
