@@ -143,26 +143,25 @@ export function Code({
   const handleStreamChunkRef = useRef<(chunk: string) => void>(() => {})
 
   // AI Code Generation Hook - use new wand system
-  const wandHook = wandConfig?.enabled
-    ? useWand({
-        wandConfig,
-        currentValue: code,
-        onStreamStart: () => handleStreamStartRef.current?.(),
-        onStreamChunk: (chunk: string) => handleStreamChunkRef.current?.(chunk),
-        onGeneratedContent: (content: string) => handleGeneratedContentRef.current?.(content),
-      })
-    : null
+  // Always call useWand to avoid hook order violations, but pass enabled flag
+  const wandHook = useWand({
+    wandConfig: wandConfig || { enabled: false, prompt: '' },
+    currentValue: code,
+    onStreamStart: () => handleStreamStartRef.current?.(),
+    onStreamChunk: (chunk: string) => handleStreamChunkRef.current?.(chunk),
+    onGeneratedContent: (content: string) => handleGeneratedContentRef.current?.(content),
+  })
 
   // Extract values from wand hook
-  const isAiLoading = wandHook?.isLoading || false
-  const isAiStreaming = wandHook?.isStreaming || false
-  const generateCodeStream = wandHook?.generateStream || (() => {})
-  const isPromptVisible = wandHook?.isPromptVisible || false
-  const showPromptInline = wandHook?.showPromptInline || (() => {})
-  const hidePromptInline = wandHook?.hidePromptInline || (() => {})
-  const promptInputValue = wandHook?.promptInputValue || ''
-  const updatePromptValue = wandHook?.updatePromptValue || (() => {})
-  const cancelGeneration = wandHook?.cancelGeneration || (() => {})
+  const isAiLoading = wandHook.isLoading || false
+  const isAiStreaming = wandHook.isStreaming || false
+  const generateCodeStream = wandHook.generateStream || (() => {})
+  const isPromptVisible = wandHook.isPromptVisible || false
+  const showPromptInline = wandHook.showPromptInline || (() => {})
+  const hidePromptInline = wandHook.hidePromptInline || (() => {})
+  const promptInputValue = wandHook.promptInputValue || ''
+  const updatePromptValue = wandHook.updatePromptValue || (() => {})
+  const cancelGeneration = wandHook.cancelGeneration || (() => {})
 
   // State management - useSubBlockValue with explicit streaming control
   const [storeValue, setStoreValue] = useSubBlockValue(blockId, subBlockId, false, {
